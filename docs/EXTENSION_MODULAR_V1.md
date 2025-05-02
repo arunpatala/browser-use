@@ -395,3 +395,564 @@ interface Config {
 ---
 
 This modular architecture provides a solid foundation for building a robust, maintainable, and extensible browser automation system. Each module has clear responsibilities and boundaries, making it easier to develop, test, and maintain the codebase. 
+
+
+
+# Browser-Use Packages
+
+This directory contains independently developable modules for the Browser-Use extension.
+
+## Package Structure
+
+```
+packages/
+  ├── agent/           # Core agent functionality
+  ├── llm/            # Language model integration
+  ├── browser/        # Browser interaction
+  ├── storage/        # Data persistence
+  ├── tasks/          # Task management
+  ├── core/           # Shared utilities
+  └── extension/      # Chrome extension specific
+```
+
+## Development Workflow
+
+Each package can be developed and tested independently:
+
+1. Each package has its own:
+   - `package.json`
+   - `tsconfig.json`
+   - `jest.config.js`
+   - `README.md`
+
+2. Shared dependencies are hoisted to the root
+
+3. Inter-package dependencies are managed through workspace references
+
+## Getting Started
+
+To work on a specific package:
+
+```bash
+cd packages/<package-name>
+npm install
+npm run dev
+npm test
+```
+
+## Package Dependencies
+
+- `core`: No dependencies
+- `llm`: Depends on `core`
+- `storage`: Depends on `core`
+- `browser`: Depends on `core`
+- `tasks`: Depends on `core`, `browser`
+- `agent`: Depends on `core`, `llm`, `tasks`
+- `extension`: Depends on all packages
+
+# Workflow Diagrams
+
+## 1. Task Execution Workflow
+```mermaid
+sequenceDiagram
+    participant User
+    participant Extension
+    participant Agent
+    participant LLM
+    participant Tasks
+    participant Browser
+    participant Storage
+
+    User->>Extension: Initiate Task
+    Extension->>Agent: Create Task Request
+    Agent->>LLM: Generate Task Plan
+    LLM-->>Agent: Return Plan Steps
+    
+    loop For Each Step
+        Agent->>Tasks: Execute Step
+        Tasks->>Browser: Perform Browser Action
+        Browser-->>Tasks: Action Result
+        Tasks->>Storage: Save Progress
+        Tasks-->>Agent: Step Complete
+    end
+    
+    Agent-->>Extension: Task Complete
+    Extension-->>User: Show Results
+```
+
+## 2. Browser Interaction Flow
+```mermaid
+sequenceDiagram
+    participant Tasks
+    participant Browser
+    participant DOM
+    participant ContentScript
+    participant Background
+    
+    Tasks->>Browser: Request Action
+    Browser->>ContentScript: Send Action Command
+    ContentScript->>DOM: Execute DOM Operation
+    DOM-->>ContentScript: Operation Result
+    ContentScript->>Background: Report Status
+    Background-->>Browser: Update State
+    Browser-->>Tasks: Action Complete
+```
+
+## 3. Memory Management Flow
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant ShortTerm
+    participant LongTerm
+    participant Storage
+    participant LLM
+    
+    Agent->>ShortTerm: Store Current Context
+    Agent->>LLM: Process Task
+    LLM->>ShortTerm: Query Context
+    ShortTerm-->>LLM: Return Context
+    
+    opt Important Information
+        Agent->>LongTerm: Store for Future
+        LongTerm->>Storage: Persist Data
+    end
+```
+
+## 4. Plugin System Architecture
+```mermaid
+graph TD
+    A[Plugin Manager] --> B[Core Plugin API]
+    B --> C[Action Registry]
+    B --> D[Event System]
+    
+    C --> E[Custom Actions]
+    C --> F[Built-in Actions]
+    
+    D --> G[Event Handlers]
+    D --> H[Event Emitters]
+    
+    I[External Plugin] --> A
+    J[Custom Plugin] --> A
+```
+
+## 5. Error Handling Flow
+```mermaid
+sequenceDiagram
+    participant Component
+    participant ErrorHandler
+    participant Logger
+    participant UI
+    participant Recovery
+    
+    Component->>ErrorHandler: Error Occurs
+    ErrorHandler->>Logger: Log Error
+    ErrorHandler->>UI: Show User Message
+    
+    alt Recoverable Error
+        ErrorHandler->>Recovery: Attempt Recovery
+        Recovery-->>Component: Resume Operation
+    else Fatal Error
+        ErrorHandler->>UI: Show Error Details
+        UI-->>Component: Reset State
+    end
+```
+
+## 6. Data Flow Between Packages
+```mermaid
+graph TD
+    Core[Core Package] --> |Types & Utils| All[All Packages]
+    
+    LLM[LLM Package] --> |AI Processing| Agent[Agent Package]
+    Storage[Storage Package] --> |Data Persistence| Agent
+    
+    Browser[Browser Package] --> |DOM Operations| Tasks[Tasks Package]
+    Tasks --> |Execution| Agent
+    
+    Agent --> |Orchestration| Extension[Extension Package]
+    Extension --> |User Interface| User[User Interface]
+```
+
+These workflow diagrams illustrate:
+1. How tasks flow from user input through the system
+2. How browser interactions are managed
+3. How memory and context are handled
+4. How plugins integrate with the core system
+5. How errors are handled and recovered from
+6. How data flows between different packages
+
+Each workflow represents a key aspect of the system's operation and shows the relationships between different components. This should help in understanding how the various parts of the system interact and depend on each other.
+
+# Real-World Use Case Examples
+
+## 1. Use Case: Buy iPhone from Amazon
+```mermaid
+sequenceDiagram
+    participant User
+    participant Extension
+    participant Agent
+    participant LLM
+    participant Tasks
+    participant Browser
+    participant Storage
+
+    User->>Extension: "Buy iPhone 15 Pro from Amazon"
+    Extension->>Agent: Create Shopping Task
+    
+    Agent->>LLM: Generate Shopping Plan
+    LLM-->>Agent: Return Steps (Search, Compare, Purchase)
+    
+    %% Search Phase
+    Agent->>Tasks: Execute Search
+    Tasks->>Browser: Navigate to amazon.com
+    Browser-->>Tasks: Page Loaded
+    Tasks->>Browser: Search "iPhone 15 Pro"
+    Browser-->>Tasks: Search Results
+    Tasks->>Storage: Save Product Options
+    
+    %% Product Analysis
+    Agent->>LLM: Analyze Product Options
+    LLM-->>Agent: Best Match Found
+    
+    %% Price Check
+    Agent->>Tasks: Check Price & Availability
+    Tasks->>Browser: Extract Price Info
+    Browser-->>Tasks: Price Data
+    Tasks->>Storage: Save Price Info
+    
+    %% User Confirmation
+    Agent-->>Extension: Show Best Option
+    Extension-->>User: Request Purchase Approval
+    User->>Extension: Confirm Purchase
+    
+    %% Purchase Process
+    Agent->>Tasks: Execute Purchase
+    Tasks->>Browser: Add to Cart
+    Browser-->>Tasks: Cart Updated
+    Tasks->>Browser: Navigate to Checkout
+    Browser-->>Tasks: Checkout Page
+    
+    %% Payment Process
+    Tasks->>Storage: Get Saved Payment Info
+    Storage-->>Tasks: Payment Details
+    Tasks->>Browser: Fill Payment Form
+    Browser-->>Tasks: Form Filled
+    
+    %% Confirmation
+    Tasks->>Browser: Complete Purchase
+    Browser-->>Tasks: Order Confirmation
+    Tasks->>Storage: Save Order Details
+    Tasks-->>Agent: Purchase Complete
+    Agent-->>Extension: Show Success
+    Extension-->>User: Display Order Summary
+```
+
+## 2. Task Breakdown for iPhone Purchase
+
+```mermaid
+graph TD
+    A[User Request] --> B[Task Planning]
+    
+    B --> C1[Search Phase]
+    B --> C2[Analysis Phase]
+    B --> C3[Purchase Phase]
+    
+    %% Search Phase Details
+    C1 --> D1[Navigate to Amazon]
+    D1 --> D2[Search iPhone 15 Pro]
+    D2 --> D3[Extract Results]
+    
+    %% Analysis Phase Details
+    C2 --> E1[Compare Models]
+    E1 --> E2[Check Reviews]
+    E2 --> E3[Verify Price]
+    E3 --> E4[Check Availability]
+    
+    %% Purchase Phase Details
+    C3 --> F1[Add to Cart]
+    F1 --> F2[Begin Checkout]
+    F2 --> F3[Fill Payment Info]
+    F3 --> F4[Confirm Order]
+    
+    %% Status Updates
+    D3 --> G[Progress Storage]
+    E4 --> G
+    F4 --> G
+    
+    G --> H[User Updates]
+```
+
+## 3. Component Interaction Details
+
+### Search Phase
+```typescript
+// Agent planning the search
+interface SearchPlan {
+    searchTerms: string[];
+    priceRange: PriceRange;
+    filters: ProductFilters;
+}
+
+// Browser interaction
+interface BrowserActions {
+    async navigateToAmazon(): Promise<void>;
+    async searchProduct(terms: string): Promise<SearchResults>;
+    async extractProductData(selector: string): Promise<ProductData>;
+}
+
+// Storage operations
+interface StorageOperations {
+    saveSearchResults(results: SearchResults): Promise<void>;
+    saveProductOptions(options: ProductOption[]): Promise<void>;
+}
+```
+
+### Analysis Phase
+```typescript
+// LLM product analysis
+interface ProductAnalysis {
+    compareOptions(products: ProductOption[]): Promise<BestMatch>;
+    validatePrice(price: number, budget: number): boolean;
+    analyzeReviews(reviews: Review[]): SentimentScore;
+}
+
+// Decision making
+interface PurchaseDecision {
+    productMatch: number;
+    priceMatch: number;
+    availabilityStatus: boolean;
+    recommendedAction: Action;
+}
+```
+
+### Purchase Phase
+```typescript
+// Purchase execution
+interface PurchaseExecution {
+    async addToCart(productId: string): Promise<CartStatus>;
+    async navigateToCheckout(): Promise<CheckoutPage>;
+    async fillPaymentDetails(payment: PaymentInfo): Promise<void>;
+    async confirmPurchase(): Promise<OrderConfirmation>;
+}
+
+// Order tracking
+interface OrderTracking {
+    orderId: string;
+    status: OrderStatus;
+    confirmationDetails: ConfirmationDetails;
+    saveOrderHistory(): Promise<void>;
+}
+```
+
+This real-world example demonstrates:
+1. How user intent is broken down into actionable steps
+2. How different components coordinate for a complex task
+3. How the system handles user interaction points
+4. How data is persisted throughout the process
+5. How error cases and validations are managed
+6. The actual interfaces used by each component
+
+The workflow shows both the high-level sequence and the detailed component interactions needed to complete a real e-commerce transaction.
+
+## 4. Use Case: Book a Flight
+```mermaid
+sequenceDiagram
+    participant User
+    participant Extension
+    participant Agent
+    participant LLM
+    participant Tasks
+    participant Browser
+    participant Storage
+
+    User->>Extension: "Book flight from NYC to SF next weekend"
+    Extension->>Agent: Create Travel Task
+    
+    Agent->>LLM: Generate Travel Plan
+    LLM-->>Agent: Return Steps (Search, Compare, Book)
+    
+    %% Initial Search
+    Agent->>Tasks: Execute Flight Search
+    Tasks->>Browser: Navigate to Multiple Airlines
+    Browser-->>Tasks: Pages Loaded
+    
+    par Search Multiple Sites
+        Tasks->>Browser: Search on Kayak
+        Tasks->>Browser: Search on Expedia
+        Tasks->>Browser: Search on Airline Sites
+    end
+    
+    %% Collect Results
+    Browser-->>Tasks: All Search Results
+    Tasks->>Storage: Save Flight Options
+    
+    %% Analysis
+    Agent->>LLM: Analyze Flight Options
+    Note over LLM: Consider price, duration, layovers
+    LLM-->>Agent: Best Options Selected
+    
+    %% User Preference Check
+    Agent-->>Extension: Show Top 3 Options
+    Extension-->>User: Request Flight Selection
+    User->>Extension: Select Preferred Flight
+    
+    %% Booking Process
+    Agent->>Tasks: Begin Booking
+    Tasks->>Browser: Navigate to Booking Page
+    Browser-->>Tasks: Booking Form Loaded
+    
+    %% Fill Details
+    Tasks->>Storage: Get Traveler Info
+    Storage-->>Tasks: Traveler Details
+    Tasks->>Browser: Fill Passenger Info
+    Tasks->>Browser: Select Seats
+    Browser-->>Tasks: Seat Map
+    
+    %% Payment
+    Tasks->>Storage: Get Payment Info
+    Storage-->>Tasks: Payment Details
+    Tasks->>Browser: Complete Payment
+    Browser-->>Tasks: Booking Confirmation
+    
+    %% Confirmation
+    Tasks->>Storage: Save Booking Details
+    Tasks-->>Agent: Booking Complete
+    Agent-->>Extension: Show Itinerary
+    Extension-->>User: Display Booking Summary
+```
+
+## 5. Use Case: Schedule Doctor Appointment
+```mermaid
+sequenceDiagram
+    participant User
+    participant Extension
+    participant Agent
+    participant LLM
+    participant Tasks
+    participant Browser
+    participant Storage
+
+    User->>Extension: "Schedule dentist appointment next week"
+    Extension->>Agent: Create Medical Task
+    
+    %% Initial Setup
+    Agent->>Storage: Get Healthcare Info
+    Storage-->>Agent: Insurance & Provider Details
+    
+    Agent->>LLM: Generate Scheduling Plan
+    LLM-->>Agent: Return Steps
+    
+    %% Provider Search
+    Agent->>Tasks: Find In-Network Dentists
+    Tasks->>Browser: Navigate to Insurance Portal
+    Browser-->>Tasks: Provider Directory
+    Tasks->>Browser: Search Local Dentists
+    Browser-->>Tasks: Provider List
+    
+    %% Availability Check
+    loop For Each Provider
+        Tasks->>Browser: Check Availability
+        Browser-->>Tasks: Available Slots
+        Tasks->>Storage: Save Options
+    end
+    
+    %% Analysis
+    Agent->>LLM: Analyze Options
+    LLM-->>Agent: Ranked Appointments
+    
+    %% User Selection
+    Agent-->>Extension: Show Available Slots
+    Extension-->>User: Request Time Selection
+    User->>Extension: Confirm Preferred Time
+    
+    %% Booking Process
+    Agent->>Tasks: Schedule Appointment
+    Tasks->>Browser: Navigate to Booking
+    Tasks->>Storage: Get Patient Info
+    Storage-->>Tasks: Medical History
+    
+    %% Form Filling
+    Tasks->>Browser: Fill Patient Forms
+    Tasks->>Browser: Submit Insurance Info
+    Browser-->>Tasks: Confirmation Page
+    
+    %% Confirmation
+    Tasks->>Storage: Save Appointment
+    Tasks-->>Agent: Scheduling Complete
+    Agent-->>Extension: Show Confirmation
+    Extension-->>User: Display Appointment Details
+```
+
+## 6. Component Interfaces for New Use Cases
+
+### Flight Booking Interfaces
+```typescript
+// Flight search handling
+interface FlightSearch {
+    searchCriteria: {
+        origin: string;
+        destination: string;
+        dates: DateRange;
+        passengers: PassengerInfo[];
+    };
+    async searchMultipleProviders(): Promise<FlightOptions[]>;
+    async compareResults(options: FlightOptions[]): Promise<RankedFlights>;
+}
+
+// Booking process
+interface FlightBooking {
+    async fillPassengerDetails(passengers: PassengerInfo[]): Promise<void>;
+    async selectSeats(preferences: SeatPreference): Promise<SeatAssignment>;
+    async processPayment(paymentInfo: PaymentDetails): Promise<BookingConfirmation>;
+}
+
+// Travel storage
+interface TravelStorage {
+    saveTravelPreferences(prefs: TravelPreferences): Promise<void>;
+    saveBookingDetails(booking: BookingDetails): Promise<void>;
+    getTravelerProfiles(): Promise<TravelerProfile[]>;
+}
+```
+
+### Medical Appointment Interfaces
+```typescript
+// Provider search
+interface ProviderSearch {
+    searchCriteria: {
+        specialty: string;
+        location: Location;
+        insurance: InsuranceInfo;
+    };
+    async findInNetworkProviders(): Promise<Provider[]>;
+    async checkAvailability(provider: Provider): Promise<TimeSlot[]>;
+}
+
+// Appointment scheduling
+interface AppointmentScheduling {
+    async submitPatientInfo(info: PatientInfo): Promise<void>;
+    async scheduleAppointment(slot: TimeSlot): Promise<Appointment>;
+    async submitInsurance(insurance: InsuranceInfo): Promise<void>;
+}
+
+// Medical records
+interface MedicalStorage {
+    async getPatientHistory(): Promise<MedicalHistory>;
+    async saveAppointment(appointment: Appointment): Promise<void>;
+    async updateInsuranceInfo(insurance: InsuranceInfo): Promise<void>;
+}
+```
+
+These additional examples demonstrate:
+1. Parallel processing (searching multiple flight sites simultaneously)
+2. Complex form handling (medical forms, flight booking forms)
+3. Integration with external systems (insurance portals, airline booking systems)
+4. Handling sensitive information (medical records, payment details)
+5. Multi-step decision processes with user interaction
+6. Different types of data persistence and retrieval
+
+Each use case shows how the system adapts to different domains while maintaining consistent patterns in:
+- Task decomposition
+- User interaction points
+- Data management
+- External system integration
+- Error handling and validation
+- Progress tracking and storage
